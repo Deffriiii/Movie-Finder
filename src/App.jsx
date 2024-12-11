@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Movies from './pages/Movies';
+import TVSeries from './pages/TVSeries';
 import HeroSlide from './components/HeroSlide';
 import MovieDetail from './components/MovieDetail';
 import TvSeriesDetail from './components/TvSeriesDetail'; // Pastikan Anda membuat komponen ini
@@ -28,7 +29,7 @@ function App() {
             } 
           />
           <Route path="/movies" element={<Movies />} />
-        
+          <Route path="/tv" element={<TVSeries />} />
           <Route path="/movie/:movieId" element={<MovieDetail />} />
           <Route path="/tv/:tvId" element={<TvSeriesDetail />} /> {/* Tambahkan rute ini */}
           <Route path="/movie/:movieId/watch" element={<WatchNow />} />
