@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, Film, Tv, Home } from 'lucide-react';
+import { Menu, X, Film, Tv, Home, Search, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMovies } from '../api/tmdbApi';
+import { searchMulti } from '../api/tmdbApi';
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Efek untuk menangani scroll dan resize
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -21,7 +21,6 @@ const Header = () => {
 
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
-      // Tutup menu mobile saat ukuran layar berubah
       if (window.innerWidth > 768) {
         setIsMobileMenuOpen(false);
         setIsSearchOpen(false);
@@ -37,39 +36,50 @@ const Header = () => {
     };
   }, []);
 
-  // Fungsi untuk mencari film/series
-  const handleSearch = async (e) => {
-    const query = e.target.value;
-    setSearchQuery(query);
+  const performSearch = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
 
-    if (query.length > 2) {
-      try {
-        const response = await fetchMovies(`search/multi?query=${query}`);
-        setSearchResults(response.results.slice(0, 5));
-      } catch (error) {
-        console.error('Error fetching search results:', error);
-      }
-    } else {
+    try {
+      const searchData = await searchMulti(query);
+      setSearchResults(searchData.results.slice(0, 5));
+    } catch (error) {
+      console.error('Search error:', error);
       setSearchResults([]);
     }
   };
 
-  // Fungsi untuk menangani klik hasil pencarian
-  const handleSearchResultClick = (result) => {
-    navigate(`/${result.media_type}/${result.id}`);
-    setSearchQuery('');
-    setIsSearchOpen(false);
-    setIsMobileMenuOpen(false);
+  const navigateToDetails = (item) => {
+    const path = item.media_type === 'movie' ? `/movie/${item.id}` : `/tv/${item.id}`;
+    navigate(path);
+    resetSearch();
   };
 
-  // Komponen navigasi yang dapat digunakan di desktop dan mobile
+  const resetSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearchOpen(false);
+  };
+
+  const getItemImage = (item) => {
+    const posterPath = item.poster_path || item.backdrop_path;
+    return posterPath 
+      ? `https://image.tmdb.org/t/p/w200${posterPath}` 
+      : '/placeholder-image.png';
+  };
+
   const NavLinks = () => (
-    <div className={`${isMobile ? 'flex flex-col space-y-6 text-center' : 'flex space-x-6'}`}>
-      {/* Navigasi dengan efek aktif dan hover yang konsisten */}
-      {[
-        { to: '/', icon: Home, label: 'Beranda' },
-        { to: '/movies', icon: Film, label: 'Film' },
-        { to: '/tv', icon: Tv, label: 'Serial TV' }
+    <div className={`
+      ${isMobile 
+        ? 'flex flex-col space-y-6 text-center bg-gray-900 p-6 rounded-lg shadow-lg' 
+        : 'flex space-x-6 items-center'}
+    `}>
+      {[ 
+        { to: '/', icon: Home, label: 'Home' },
+        { to: '/movies', icon: Film, label: 'Movies' },
+        { to: '/tv', icon: Tv, label: 'TV Shows' }
       ].map(({ to, icon: Icon, label }) => (
         <NavLink
           key={to}
@@ -77,152 +87,137 @@ const Header = () => {
           className={({ isActive }) => `
             flex items-center gap-2 
             hover:text-red-400 transition-colors 
-            ${isActive ? 'text-red-500 font-bold' : 'text-white/90'}
-            ${isMobile ? 'justify-center py-2' : ''}
+            ${isActive 
+              ? 'text-red-500 font-bold' 
+              : 'text-white/80 hover:text-white'}
+            ${isMobile ? 'justify-center py-3 text-lg' : 'text-sm'}
           `}
           onClick={() => {
             setIsMobileMenuOpen(false);
-            setIsSearchOpen(false);
           }}
         >
           <Icon size={20} />
           {label}
         </NavLink>
       ))}
-    </div>
-  );
-
-  // Komponen input pencarian
-  const SearchInput = ({ mobile = false }) => (
-    <div className="relative w-full">
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={handleSearch}
-        className={`
-          w-full bg-gray-800 text-white 
-          ${mobile ? 'px-4 py-3 rounded-lg pl-10' : 'px-4 py-2 rounded-lg pl-10'}
-          focus:outline-none focus:ring-2 focus:ring-red-500
-        `}
-        placeholder="Cari film atau serial TV..."
-      />
-      <Search 
-        size={20} 
-        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
-      />
-      
-      {/* Hasil Pencarian */}
-      <AnimatePresence>
-        {searchQuery.length > 2 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className={`
-              absolute top-full left-0 right-0 mt-2 
-              bg-gray-800 rounded-lg shadow-lg z-50 
-              ${mobile ? 'max-h-72' : 'max-h-64'} 
-              overflow-y-auto
-            `}
-          >
-            {searchResults.length > 0 ? (
-              <ul>
-                {searchResults.map((result) => (
-                  <motion.li 
-                    key={result.id}
-                    whileHover={{ backgroundColor: 'rgba(55, 65, 81, 0.5)' }}
-                  >
-                    <button
-                      onClick={() => handleSearchResultClick(result)}
-                      className="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white"
-                    >
-                      {result.title || result.name}
-                    </button>
-                  </motion.li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-400 text-center py-4">Tidak ada hasil yang ditemukan.</p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+   </div>
   );
 
   return (
     <header 
       className={`
-        fixed top-0 left-0 right-0 z-50 
-        transition-all duration-300 
-        ${isScrolled ? 'bg-black/80 backdrop-blur-md shadow-lg' : 'bg-transparent'}
+        fixed top-0 left-0 right-0 z-50 transition-all duration-300 
+        ${isScrolled 
+          ? 'bg-gradient-to-b from-black/90 to-transparent backdrop-blur-md shadow-lg' 
+          : 'bg-gradient-to-b from-black/70 to-transparent'}
       `}
     >
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
         <div className="flex items-center justify-between">
-          {/* Logo */}
           <Link
             to="/"
-            className="text-2xl font-bold text-white drop-shadow-lg hover:text-red-400 transition-colors"
+            className="text-3xl font-bold text-white drop-shadow-lg hover:text-red-400 transition-colors"
           >
             MovieFinder
           </Link>
 
-          {/* Navigasi Desktop */}
-          {!isMobile ? (
-            <div className="flex items-center space-x-6">
-              <div className="w-80">
-                <SearchInput />
-              </div>
-              <NavLinks />
-            </div>
-          ) : (
-            <div className="flex items-center space-x-4">
-              {/* Tombol Pencarian Mobile */}
-              <button 
-                onClick={() => setIsSearchOpen(true)}
-                className="text-white"
-              >
-                <Search size={24} />
-              </button>
+          <div className="flex items-center space-x-6">
+            {/* Search Button */}
+            <button
+              onClick={() => setIsSearchOpen(!isSearchOpen)}
+              className="text-white hover:text-red-400 transition-colors"
+            >
+              <Search size={24} />
+            </button>
 
-              {/* Tombol Menu Mobile */}
+            {!isMobile ? (
+              <NavLinks />
+            ) : (
               <button
                 onClick={() => setIsMobileMenuOpen(true)}
                 className="text-white focus:outline-none"
               >
                 <Menu size={24} />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Overlay Pencarian Mobile */}
+        {/* Search Modal (Desktop & Mobile) */}
         <AnimatePresence>
-          {isMobile && isSearchOpen && (
+          {isSearchOpen && (
             <motion.div
-              initial={{ opacity: 0, y: -50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className="fixed inset-0 bg-black bg-opacity-95 z-50 p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
             >
-              <div className="relative">
+              <div className="w-full max-w-xl relative">
                 <button
-                  onClick={() => setIsSearchOpen(false)}
-                  className="absolute right-0 top-0 text-white"
+                  onClick={resetSearch}
+                  className="absolute -top-10 right-0 text-white hover:text-red-400"
                 >
                   <X size={24} />
                 </button>
-                
-                <div className="mt-12">
-                  <SearchInput mobile={true} />
-                </div>
+
+                <input
+                  type="text"
+                  placeholder="Search movies and TV shows..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    performSearch(e.target.value);
+                  }}
+                  className="
+                    w-full px-6 py-4 
+                    bg-gray-800/60 backdrop-blur-sm 
+                    text-white text-lg 
+                    rounded-full 
+                    focus:outline-none focus:ring-2 focus:ring-red-500
+                  "
+                />
+
+                {searchResults.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 bg-gray-800/80 backdrop-blur-sm rounded-lg max-h-96 overflow-y-auto"
+                  >
+                    {searchResults.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => navigateToDetails(item)}
+                        className="
+                          flex items-center p-4 cursor-pointer 
+                          hover:bg-gray-700 transition-colors
+                          border-b border-gray-700 last:border-b-0
+                        "
+                      >
+                        <img 
+                          src={getItemImage(item)} 
+                          alt={item.title || item.name}
+                          className="w-16 h-24 object-cover rounded-md mr-4 shadow-md"
+                        />
+                        <div>
+                          <h3 className="text-white font-semibold text-lg">
+                            {item.title || item.name}
+                          </h3>
+                          <p className="text-gray-400 text-sm">
+                            {item.media_type === 'movie' ? 'Movie' : 'TV Show'}
+                            {item.release_date && ` • ${item.release_date.split('-')[0]}`}
+                            {item.first_air_date && ` • ${item.first_air_date.split('-')[0]}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Menu Mobile */}
+        {/* Mobile Menu */}
         <AnimatePresence>
           {isMobile && isMobileMenuOpen && (
             <motion.div
@@ -230,29 +225,24 @@ const Header = () => {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween' }}
-              className="fixed inset-0 bg-black bg-opacity-95 z-50"
+              className="fixed inset-0 bg-gradient-to-b from-black/95 to-gray-900 z-50 p-6"
             >
-              <nav className="flex flex-col h-full">
-                <div className="flex justify-between p-6">
-                  <Link
-                    to="/"
-                    className="text-2xl font-bold text-white"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    MovieFinder
-                  </Link>
-                  <button
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-white focus:outline-none"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-                
-                <div className="flex-grow flex flex-col justify-center items-center space-y-6">
-                  <NavLinks />
-                </div>
-              </nav>
+              <div className="flex justify-between items-center mb-8">
+                <Link
+                  to="/"
+                  className="text-2xl font-bold text-white"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  MovieFinder
+                </Link>
+                <button 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-white"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <NavLinks />
             </motion.div>
           )}
         </AnimatePresence>

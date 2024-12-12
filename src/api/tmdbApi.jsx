@@ -9,8 +9,8 @@ export const fetchMovies = async (endpoint, params = {}) => {
     const response = await axios.get(`${BASE_URL}/${endpoint}`, {
       params: {
         api_key: API_KEY,
-        ...params
-      }
+        ...params,
+      },
     });
     return response.data;
   } catch (error) {
@@ -30,58 +30,6 @@ export const getTvSeriesDetails = (tvId) =>
   fetchMovies(`tv/${tvId}`, { 
     append_to_response: 'videos,credits' 
   });
-
-// Pencarian film dengan opsi tambahan
-export const searchMovies = async (query, options = {}) => {
-  const defaultOptions = {
-    page: 1,
-    language: 'en-US',
-    include_adult: false,
-    region: ''
-  };
-
-  const searchParams = { 
-    query, 
-    ...defaultOptions, 
-    ...options 
-  };
-
-  return fetchMovies('search/movie', searchParams);
-};
-
-// Pencarian TV Series dengan opsi tambahan
-export const searchTvSeries = async (query, options = {}) => {
-  const defaultOptions = {
-    page: 1,
-    language: 'en-US',
-    include_adult: false
-  };
-
-  const searchParams = { 
-    query, 
-    ...defaultOptions, 
-    ...options 
-  };
-
-  return fetchMovies('search/tv', searchParams);
-};
-
-// Pencarian multi (campuran film dan TV Series)
-export const searchMulti = async (query, options = {}) => {
-  const defaultOptions = {
-    page: 1,
-    language: 'en-US',
-    include_adult: false
-  };
-
-  const searchParams = { 
-    query, 
-    ...defaultOptions, 
-    ...options 
-  };
-
-  return fetchMovies('search/multi', searchParams);
-};
 
 // Mendapatkan film berdasarkan genre
 export const getMoviesByGenre = (genreId, options = {}) => {
@@ -140,5 +88,31 @@ export const getTvSeriesTrailers = async (tvId) => {
       results: [],
       id: tvId
     };
+  }
+};
+// Search API
+export const searchMulti = async (query, page = 1) => {
+  if (!query) return { results: [], total_pages: 0, total_results: 0 };
+
+  try {
+    const response = await fetchMovies('search/multi', {
+      query: query,
+      page: page,
+      include_adult: false,
+      language: 'en-US'
+    });
+
+    // Filter out people and keep only movies and TV shows
+    const filteredResults = response.results.filter(
+      item => item.media_type === 'movie' || item.media_type === 'tv'
+    );
+
+    return {
+      ...response,
+      results: filteredResults
+    };
+  } catch (error) {
+    console.error('Search API Error:', error);
+    return { results: [], total_pages: 0, total_results: 0 };
   }
 };
